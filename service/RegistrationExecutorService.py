@@ -58,12 +58,6 @@ async def ask_for_sections(
             callback_data=f"sect_{section_id}"  # Формат: sect_<ID_раздела>
         )
 
-    # Кнопка "Все разделы" с ID предмета
-    builder.button(
-        text="Все разделы",
-        callback_data=f"all_{subject_id}"
-    )
-
     # Кнопка завершения выбора
     builder.button(
         text="✅ Завершить выбор",
@@ -173,12 +167,6 @@ def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None) -> In
             text=f"{'✅ ' if section_id in selected_ids else ''}{section_name}",
             callback_data=f"sect_{section_id}"
         )
-
-    # Кнопка "Все разделы"
-    builder.button(
-        text="Все разделы",
-        callback_data=f"all_{subject_id}"
-    )
 
     # Кнопка завершения
     builder.button(

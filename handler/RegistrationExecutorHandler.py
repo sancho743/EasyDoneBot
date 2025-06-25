@@ -120,7 +120,14 @@ async def handle_subjects_done(callback: CallbackQuery, state: FSMContext):
 # Обработчик выбора разделов
 @executor_router.callback_query(F.data.startswith("sect_"), ExecutorStates.SELECTING_SECTIONS)
 async def handle_section_selection(callback: CallbackQuery, state: FSMContext):
+    print(f"DEBUG: handle_section_selection triggered with callback_data: {callback.data}")
     try:
+        if callback.data == "sect_done":
+            # This callback is handled by handle_sections_done.
+            # We return immediately to let that handler manage the callback, including answering it.
+            print("DEBUG: handle_section_selection is exiting early for sect_done.")
+            return
+
         # 1. Логируем входящие данные для диагностики
         print(f"DEBUG: Received callback data: {callback.data}")
 
@@ -128,14 +135,6 @@ async def handle_section_selection(callback: CallbackQuery, state: FSMContext):
         parts = callback.data.split('_')
         if len(parts) < 2:
             raise ValueError("Неверный формат callback_data")
-
-        # Обрабатываем случай кнопки "done"
-        if parts[1] == "done":
-            # Здесь логика для завершения выбора разделов
-            await callback.answer("Выбор разделов завершен")
-            # Возможно переход к следующему состоянию
-            # await state.set_state(SomeNextState)
-            return
 
         # Обрабатываем обычный выбор раздела
         section_id = int(parts[1])  # Берем только section_id без дополнительных параметров
@@ -186,29 +185,10 @@ async def handle_section_selection(callback: CallbackQuery, state: FSMContext):
         print(f"Неожиданная ошибка: {e}\nTraceback: {traceback.format_exc()}")
         await callback.answer("Произошла непредвиденная ошибка", show_alert=True)
 
-
-# Обработчик "Все разделы"
-@executor_router.callback_query(F.data.startswith("all_"), ExecutorStates.SELECTING_SECTIONS)
-async def handle_all_sections(callback: CallbackQuery, state: FSMContext):
-    try:
-        subject_id = int(callback.data.split("_")[1])
-        data = await state.get_data()
-
-        # Выбираем все разделы для предмета
-        data["subject_details"][subject_id] = list(SUBJECT_SECTIONS[subject_id].keys())
-        await state.update_data(data)
-
-        await update_sections_keyboard(callback, subject_id, data["subject_details"][subject_id])
-        await callback.answer("Выбраны все разделы")
-
-    except Exception as e:
-        print(f"Ошибка в handle_all_sections: {e}")
-        await callback.answer("Произошла ошибка", show_alert=True)
-
-
 # Обработчик завершения выбора разделов
 @executor_router.callback_query(F.data == "sect_done", ExecutorStates.SELECTING_SECTIONS)
 async def handle_sections_done(callback: CallbackQuery, state: FSMContext):
+    print(f"DEBUG: handle_sections_done triggered with callback_data: {callback.data}")
     data = await state.get_data()
     next_index = data["current_subject_index"] + 1
 
@@ -217,13 +197,16 @@ async def handle_sections_done(callback: CallbackQuery, state: FSMContext):
     except:
         pass
 
+    print(f"DEBUG: handle_sections_done: current_subject_index={data.get('current_subject_index')}, next_index={next_index}, num_subjects={len(data.get('subjects', []))}")
     if next_index < len(data["subjects"]):
         # Переходим к следующему предмету
         await state.update_data(current_subject_index=next_index)
         next_subject_id = data["subjects"][next_index]
+        print(f"DEBUG: handle_sections_done: Advancing to next subject_id: {data['subjects'][next_index]}")
         await ask_for_sections(callback.message, next_subject_id)
     else:
         # Все разделы выбраны - переходим к описанию
+        print("DEBUG: handle_sections_done: All sections selected, moving to WAITING_DESCRIPTION.")
         await state.set_state(ExecutorStates.WAITING_DESCRIPTION)
         await ask_for_description(callback.message)
 
