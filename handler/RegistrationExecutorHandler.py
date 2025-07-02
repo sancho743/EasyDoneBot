@@ -27,6 +27,7 @@ class ExecutorStates(StatesGroup):
     WAITING_NAME = State()
     WAITING_EDUCATION = State()
     WAITING_CONSENT = State()
+    WAITING_EXPERIENCE = State()
     SELECTING_SUBJECTS = State()
     SELECTING_SECTIONS = State()
 
@@ -118,15 +119,10 @@ async def handle_subjects_done(callback: CallbackQuery, state: FSMContext):
 
 
 # Обработчик выбора разделов
-@executor_router.callback_query(F.data.startswith("sect_"), ExecutorStates.SELECTING_SECTIONS)
+@executor_router.callback_query(F.data.regexp(r"^sect_(?!done\b)\d+$"), ExecutorStates.SELECTING_SECTIONS)
 async def handle_section_selection(callback: CallbackQuery, state: FSMContext):
     print(f"DEBUG: handle_section_selection triggered with callback_data: {callback.data}")
     try:
-        if callback.data == "sect_done":
-            # This callback is handled by handle_sections_done.
-            # We return immediately to let that handler manage the callback, including answering it.
-            print("DEBUG: handle_section_selection is exiting early for sect_done.")
-            return
 
         # 1. Логируем входящие данные для диагностики
         print(f"DEBUG: Received callback data: {callback.data}")
@@ -208,9 +204,24 @@ async def handle_sections_done(callback: CallbackQuery, state: FSMContext):
         # Все разделы выбраны - переходим к описанию
         print("DEBUG: handle_sections_done: All sections selected, moving to WAITING_DESCRIPTION.")
         await state.set_state(ExecutorStates.WAITING_DESCRIPTION)
-        await ask_for_description(callback.message)
+        await ask_for_description(callback.message,state)
 
     await callback.answer()
+
+@executor_router.message(ExecutorStates.WAITING_DESCRIPTION)
+async def handle_description_input(message: Message, state: FSMContext):
+    description = message.text.strip()
+
+    if contains_links(description):
+        await message.answer("❌ Описание не может содержать ссылки или контакты")
+        return
+
+    await state.update_data(description=description)
+    await state.set_state(ExecutorStates.WAITING_EXPERIENCE)
+
+    print("DEBUG: handle_description_input: Description added, moving to WAITING_EXPERIENCE.")
+    await ask_for_experience(message, state)
+    await state.clear()
 
 @executor_router.message(ExecutorStates.WAITING_NAME)
 async def handle_name_input(message: Message, state: FSMContext):
@@ -231,7 +242,7 @@ async def handle_name_input(message: Message, state: FSMContext):
     await ask_for_subjects(message, state)
     await state.clear()  # Важно очистить состояние
 
-@executor_router.message(F.text.isdigit())
+@executor_router.message(ExecutorStates.WAITING_EXPERIENCE)
 async def handle_experience_input(message: Message, state: FSMContext):
     experience = int(message.text)
     if experience > 50:
@@ -239,10 +250,11 @@ async def handle_experience_input(message: Message, state: FSMContext):
         return
 
     years_word = get_years_form(experience)  # Используем универсальный обработчик
-
+    print("DEBUG: handle_experience_input: experience added, moving to WAITING_EDUCATION")
     await state.update_data(experience=experience, years_word=years_word)
+    await state.set_state(ExecutorStates.WAITING_EDUCATION)
     await ask_for_education(message, state)
-
+    await state.clear()  # Важно очистить состояние
 
 # Обработчик образования (только при состоянии WAITING_EDUCATION)
 @executor_router.message(
