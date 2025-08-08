@@ -1,5 +1,4 @@
 from typing import Dict, Union, List
-from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
@@ -12,7 +11,6 @@ executor_data: Dict[int, Dict] = {}
 # --- Основные функции ---
 async def ask_for_subjects(
         target: Union[Message, CallbackQuery],
-        state: FSMContext,
         current_selected: List[str] = None
 ):
     """Универсальная функция для запроса предметов"""
@@ -177,25 +175,25 @@ def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None) -> In
     builder.adjust(1)  # По одному разделу в строке
     return builder.as_markup()
 
-async def ask_for_description(message: Message, state: FSMContext):
+async def ask_for_description(message: Message):
     """Запрос описания деятельности"""
     await message.answer(
         "✏️ Напишите описание вашей деятельности (без ссылок!):\n"
         "Пример: «Решаю задачи по математике для студентов 1-2 курсов»"
     )
-async def ask_for_experience(message: Message, state: FSMContext):
+async def ask_for_experience(message: Message):
     """Запрос опыта работы"""
     await message.answer(
         "📆 Укажите ваш опыт работы (в годах или «Нет опыта»):"
     )
 
-async def ask_for_photo(message: Message, state: FSMContext):
+async def ask_for_photo(message: Message):
     """Запрос фото"""
     await message.answer(
         "📷 Прикрепите ваше фото (это повысит доверие клиентов):"
     )
 
-async def ask_for_education(message: Message, state: FSMContext):
+async def ask_for_education(message: Message):
     """Запрос информации об образовании"""
     await message.answer(
         "🎓 Укажите ваше образование(например: "
@@ -238,20 +236,44 @@ def get_solver_main_menu_keyboard():
         one_time_keyboard=False
     )
 
+
 def format_profile_text(data: dict) -> str:
-    """Обновленное форматирование с разделами"""
     profile = [
         "✅ Анкета заполнена!",
         f"👤 Имя: {data.get('name', 'не указано')}",
-        f"📚 Предметы:"
+        f"📝 Описание: {data.get('description', 'не указано')}",
+        f"⏳ Опыт: {data.get('experience', 0)} {get_years_form(data.get('experience', 0))}",
+        f"🎓 Образование: {data.get('education', 'не указано')}",
+        "\n📚 Выбранные предметы и разделы:"
     ]
 
-    for subject, sections in data.get('subject_details', {}).items():
-        profile.append(f"  - {subject}: {', '.join(sections) if sections else 'все разделы'}")
+    subject_details = data.get('subject_details', {})
+    if not subject_details:
+        profile.append("  Предметы не выбраны.")
+    else:
+        for subject_id_str, section_ids in subject_details.items():  # Assuming subject_id might be string from FSM data key
+            try:
+                subject_id = int(subject_id_str)  # Convert to int for lookup
+            except ValueError:
+                profile.append(f"  - Некорректный ID предмета: {subject_id_str}")
+                continue
 
-    profile.extend([
-        f"📝 Описание: {data.get('description', 'не указано')}",
-        f"🎓 Образование: {data.get('education', 'не указано')}",
-        f"⏳ Опыт: {data.get('experience', 0)} {get_years_form(data.get('experience', 0))}"
-    ])
+            subject_name = SUBJECTS.get(subject_id, f"Предмет ID {subject_id}")
+
+            section_names = []
+            if not section_ids:  # No specific sections selected for this subject
+                section_names.append("все разделы")
+            else:
+                current_subject_sections_map = SUBJECT_SECTIONS.get(subject_id, {})
+                for section_id_str in section_ids:  # Assuming section_id might be string
+                    try:
+                        section_id = int(section_id_str)  # Convert to int for lookup
+                    except ValueError:
+                        section_names.append(f"Некорректный ID раздела: {section_id_str}")
+                        continue
+                    section_name = current_subject_sections_map.get(section_id, f"Раздел ID {section_id}")
+                    section_names.append(section_name)
+
+            profile.append(f"  - {subject_name}: {', '.join(section_names)}")
+
     return "\n".join(profile)

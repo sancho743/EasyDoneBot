@@ -10,9 +10,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from service.RegistrationExecutorService import ask_for_subjects, ask_for_description, contains_links, \
     ask_for_experience, ask_for_photo, ask_for_education, get_years_form, get_solver_main_menu_keyboard, \
-    format_profile_text, ask_for_sections, SUBJECT_SECTIONS, update_subjects_keyboard, update_sections_keyboard
-from utils.constants import SUBJECTS
-
+    format_profile_text, ask_for_sections, update_subjects_keyboard, update_sections_keyboard
 
 # Загружаем текст соглашения
 BASE_DIR = Path(__file__).parent.parent
@@ -30,6 +28,7 @@ class ExecutorStates(StatesGroup):
     WAITING_EXPERIENCE = State()
     SELECTING_SUBJECTS = State()
     SELECTING_SECTIONS = State()
+    WAITING_TYPE_OF_TASK = State()
 
 @executor_router.callback_query(F.data == "register_as_executor")
 async def handle_executor_registration(callback: CallbackQuery, state: FSMContext):
@@ -202,11 +201,13 @@ async def handle_sections_done(callback: CallbackQuery, state: FSMContext):
         await ask_for_sections(callback.message, next_subject_id)
     else:
         # Все разделы выбраны - переходим к описанию
+
         print("DEBUG: handle_sections_done: All sections selected, moving to WAITING_DESCRIPTION.")
         await state.set_state(ExecutorStates.WAITING_DESCRIPTION)
-        await ask_for_description(callback.message,state)
+        await ask_for_description(callback.message)
 
     await callback.answer()
+
 
 @executor_router.message(ExecutorStates.WAITING_DESCRIPTION)
 async def handle_description_input(message: Message, state: FSMContext):
@@ -220,8 +221,7 @@ async def handle_description_input(message: Message, state: FSMContext):
     await state.set_state(ExecutorStates.WAITING_EXPERIENCE)
 
     print("DEBUG: handle_description_input: Description added, moving to WAITING_EXPERIENCE.")
-    await ask_for_experience(message, state)
-    await state.clear()
+    await ask_for_experience(message)
 
 @executor_router.message(ExecutorStates.WAITING_NAME)
 async def handle_name_input(message: Message, state: FSMContext):
@@ -237,12 +237,10 @@ async def handle_name_input(message: Message, state: FSMContext):
 
     await state.update_data(name=name)
     await state.set_state(ExecutorStates.SELECTING_SUBJECTS)
-
     # Вызываем выбор предметов после ввода имени
-    await ask_for_subjects(message, state)
-    await state.clear()  # Важно очистить состояние
+    await ask_for_subjects(message)
 
-@executor_router.message(ExecutorStates.WAITING_EXPERIENCE)
+@executor_router.message(F.text.isdigit())  # This decorator implies message.text is a digit.
 async def handle_experience_input(message: Message, state: FSMContext):
     experience = int(message.text)
     if experience > 50:
@@ -250,11 +248,9 @@ async def handle_experience_input(message: Message, state: FSMContext):
         return
 
     years_word = get_years_form(experience)  # Используем универсальный обработчик
-    print("DEBUG: handle_experience_input: experience added, moving to WAITING_EDUCATION")
     await state.update_data(experience=experience, years_word=years_word)
     await state.set_state(ExecutorStates.WAITING_EDUCATION)
-    await ask_for_education(message, state)
-    await state.clear()  # Важно очистить состояние
+    await ask_for_education(message)
 
 # Обработчик образования (только при состоянии WAITING_EDUCATION)
 @executor_router.message(
@@ -265,9 +261,8 @@ async def handle_education_input(message: Message, state: FSMContext):
     if contains_links(message.text):
         await message.answer("❌ Описание образования не должно содержать ссылок!")
         return
-
     await state.update_data(education=message.text)
-    await ask_for_photo(message, state)
+    await ask_for_photo(message)
 
 @executor_router.message(F.photo)
 async def handle_photo_upload(message: Message, state: FSMContext):

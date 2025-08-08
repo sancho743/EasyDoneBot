@@ -25,7 +25,6 @@ async def ask_for_role(callback: CallbackQuery, state: FSMContext):
     )
 
     try:
-        print(builder.buttons)  # Проверьте, что кнопки добавлены
         await callback.message.edit_text(
             "Выберите роль:",
             reply_markup=builder.as_markup()
