@@ -1,9 +1,11 @@
 from typing import Dict, Union, List
+
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from service.RegistrationService import contains_links, get_subjects_keyboard
-from utils.constants import SUBJECT_SECTIONS, SUBJECTS
+from utils.constants import SUBJECT_SECTIONS, SUBJECTS, TYPE_OF_TASK
 
 # Временное хранилище данных (позже заменим на БД)
 executor_data: Dict[int, Dict] = {}
@@ -175,6 +177,46 @@ def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None) -> In
     builder.adjust(1)  # По одному разделу в строке
     return builder.as_markup()
 
+def get_task_type_keyboard(selected_ids: List[int] = None) -> InlineKeyboardMarkup:
+    """Генерирует клавиатуру с типами задач"""
+    if selected_ids is None:
+        selected_ids = []
+
+    builder = InlineKeyboardBuilder()
+
+    for task_id, task_name in TYPE_OF_TASK.items():
+        builder.button(
+            text=f"{'✅ ' if task_id in selected_ids else ''}{task_name}",
+            callback_data=f"task_type_{task_id}"
+        )
+
+    builder.button(text="Готово", callback_data="task_type_done")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+async def update_task_type_keyboard(callback: CallbackQuery, selected_ids: List[int]):
+    """Обновляет клавиатуру с типами задач"""
+    try:
+        keyboard = get_task_type_keyboard(selected_ids)
+        await callback.message.edit_text(
+            text="Выберите типы задач:",
+            reply_markup=keyboard
+        )
+    except Exception as e:
+        print(f"Ошибка при обновлении клавиатуры типов задач: {e}")
+        await callback.message.answer(
+            text="Выберите типы задач:",
+            reply_markup=get_task_type_keyboard(selected_ids)
+        )
+
+async def ask_for_task_type(message: Message, state: FSMContext):
+    """Запрос типов задач"""
+    await message.answer(
+        "Выберите типы задач, которые вы выполняете:",
+        reply_markup=get_task_type_keyboard()
+    )
+
 async def ask_for_description(message: Message):
     """Запрос описания деятельности"""
     await message.answer(
@@ -246,6 +288,15 @@ def format_profile_text(data: dict) -> str:
         f"🎓 Образование: {data.get('education', 'не указано')}",
         "\n📚 Выбранные предметы и разделы:"
     ]
+
+    # Добавляем типы задач
+    task_types_ids = data.get('task_types', [])
+    if task_types_ids:
+        # Преобразуем ID в названия
+        task_types_names = [TYPE_OF_TASK.get(int(tt_id), 'неизвестный тип') for tt_id in task_types_ids]
+        profile.append(f"🔧 Типы задач: {', '.join(task_types_names)}")
+
+    profile.append("\n📚 Выбранные предметы и разделы:")
 
     subject_details = data.get('subject_details', {})
     if not subject_details:

@@ -10,7 +10,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from service.RegistrationExecutorService import ask_for_subjects, ask_for_description, contains_links, \
     ask_for_experience, ask_for_photo, ask_for_education, get_years_form, get_solver_main_menu_keyboard, \
-    format_profile_text, ask_for_sections, update_subjects_keyboard, update_sections_keyboard
+    format_profile_text, ask_for_sections, update_subjects_keyboard, update_sections_keyboard, \
+    update_task_type_keyboard, ask_for_task_type
 
 # Загружаем текст соглашения
 BASE_DIR = Path(__file__).parent.parent
@@ -28,7 +29,7 @@ class ExecutorStates(StatesGroup):
     WAITING_EXPERIENCE = State()
     SELECTING_SUBJECTS = State()
     SELECTING_SECTIONS = State()
-    WAITING_TYPE_OF_TASK = State()
+    SELECTING_TASK_TYPE = State()
 
 @executor_router.callback_query(F.data == "register_as_executor")
 async def handle_executor_registration(callback: CallbackQuery, state: FSMContext):
@@ -186,12 +187,10 @@ async def handle_sections_done(callback: CallbackQuery, state: FSMContext):
     print(f"DEBUG: handle_sections_done triggered with callback_data: {callback.data}")
     data = await state.get_data()
     next_index = data["current_subject_index"] + 1
-
     try:
         await callback.message.delete()
     except:
         pass
-
     print(f"DEBUG: handle_sections_done: current_subject_index={data.get('current_subject_index')}, next_index={next_index}, num_subjects={len(data.get('subjects', []))}")
     if next_index < len(data["subjects"]):
         # Переходим к следующему предмету
@@ -200,12 +199,45 @@ async def handle_sections_done(callback: CallbackQuery, state: FSMContext):
         print(f"DEBUG: handle_sections_done: Advancing to next subject_id: {data['subjects'][next_index]}")
         await ask_for_sections(callback.message, next_subject_id)
     else:
-        # Все разделы выбраны - переходим к описанию
+        # Все разделы выбраны - переходим к выбору типа задач
+        print("DEBUG: handle_sections_done: All sections selected, moving to SELECTING_TASK_TYPE.")
+        await state.set_state(ExecutorStates.SELECTING_TASK_TYPE)
+        await ask_for_task_type(callback.message, state)
+    await callback.answer()
 
-        print("DEBUG: handle_sections_done: All sections selected, moving to WAITING_DESCRIPTION.")
-        await state.set_state(ExecutorStates.WAITING_DESCRIPTION)
-        await ask_for_description(callback.message)
+# Обработчик выбора типов задач
+@executor_router.callback_query(F.data.startswith("task_type_"), ExecutorStates.SELECTING_TASK_TYPE)
+async def handle_task_type_selection(callback: CallbackQuery, state: FSMContext):
+    action = callback.data.split("_")[2]
 
+    if action == "done":
+        await handle_task_type_done(callback, state)
+        return
+
+    task_type_id = int(action)
+    data = await state.get_data()
+    selected_ids = data.get("task_types", [])
+
+    if task_type_id in selected_ids:
+        selected_ids.remove(task_type_id)
+    else:
+        selected_ids.append(task_type_id)
+
+    await state.update_data(task_types=selected_ids)
+    await update_task_type_keyboard(callback, selected_ids)
+    await callback.answer()
+
+# Обработчик завершения выбора типов задач
+@executor_router.callback_query(F.data == "task_type_done", ExecutorStates.SELECTING_TASK_TYPE)
+async def handle_task_type_done(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if not data.get("task_types"):
+        await callback.answer("Выберите хотя бы один тип задач!", show_alert=True)
+        return
+
+    await callback.message.delete()
+    await state.set_state(ExecutorStates.WAITING_DESCRIPTION)
+    await ask_for_description(callback.message)
     await callback.answer()
 
 
