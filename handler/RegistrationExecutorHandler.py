@@ -8,10 +8,12 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from service.MenuService import get_solver_main_menu_keyboard
 from service.RegistrationExecutorService import ask_for_subjects, ask_for_description, contains_links, \
-    ask_for_experience, ask_for_photo, ask_for_education, get_years_form, get_solver_main_menu_keyboard, \
+    ask_for_experience, ask_for_photo, ask_for_education, get_years_form, \
     format_profile_text, ask_for_sections, update_subjects_keyboard, update_sections_keyboard, \
     update_task_type_keyboard, ask_for_task_type
+from utils.DataStore import user_roles
 
 # Загружаем текст соглашения
 BASE_DIR = Path(__file__).parent.parent
@@ -243,6 +245,7 @@ async def handle_task_type_done(callback: CallbackQuery, state: FSMContext):
 
 @executor_router.message(ExecutorStates.WAITING_DESCRIPTION)
 async def handle_description_input(message: Message, state: FSMContext):
+    print(f"DEBUG: ExecutorHandler state is {await state.get_state()}")
     description = message.text.strip()
 
     if contains_links(description):
@@ -318,6 +321,10 @@ async def handle_photo_upload(message: Message, state: FSMContext):
             reply_markup=get_solver_main_menu_keyboard()
         )
         print("Главное меню показано")
+
+        # Сохраняем роль пользователя
+        user_roles[message.from_user.id] = 'executor'
+        print(f"DEBUG: Saved role for user {message.from_user.id}. Current roles: {user_roles}")
 
         # Здесь будет сохранение в БД
         # await save_executor_profile(data, photo_id)

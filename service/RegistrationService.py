@@ -48,33 +48,3 @@ def contains_links(text: str) -> bool:
         re.IGNORECASE
     )
     return bool(pattern.search(text))
-
-def get_subjects_keyboard(selected_subjects: Optional[List[str]] = None) -> InlineKeyboardMarkup:
-    """
-    Создает клавиатуру для выбора предметов с отметкой выбранных
-
-    :param selected_subjects: список уже выбранных предметов
-    :return: объект InlineKeyboardMarkup
-    """
-    if selected_subjects is None:
-        selected_subjects = []
-
-    builder = InlineKeyboardBuilder()
-
-    # Добавляем кнопки для каждого предмета
-    for subject in SUBJECTS:  # SUBJECTS - ваш список предметов из констант
-        builder.button(
-            text=f"{'✅ ' if subject in selected_subjects else ''}{subject}",
-            callback_data=f"subject_{subject}"
-        )
-
-    # Добавляем кнопку "Готово" (отдельный ряд)
-    builder.button(
-        text="✅ Готово",
-        callback_data="subjects_done"
-    )
-
-    # Настраиваем расположение (предметы по 1 в ряд, "Готово" отдельно)
-    builder.adjust(1, 1)
-
-    return builder.as_markup()

@@ -4,7 +4,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from service.RegistrationService import contains_links, get_subjects_keyboard
+from service.KeyBoardService import get_sections_keyboard, get_task_type_keyboard, get_subjects_keyboard
+from service.RegistrationService import contains_links
 from utils.constants import SUBJECT_SECTIONS, SUBJECTS, TYPE_OF_TASK
 
 # Временное хранилище данных (позже заменим на БД)
@@ -13,7 +14,7 @@ executor_data: Dict[int, Dict] = {}
 # --- Основные функции ---
 async def ask_for_subjects(
         target: Union[Message, CallbackQuery],
-        current_selected: List[str] = None
+        current_selected: List[int] = None
 ):
     """Универсальная функция для запроса предметов"""
     message = target.message if isinstance(target, CallbackQuery) else target
@@ -48,57 +49,15 @@ async def ask_for_sections(
     if selected_section_ids is None:
         selected_section_ids = []
 
-    builder = InlineKeyboardBuilder()
-    sections = SUBJECT_SECTIONS.get(subject_id, {})  # Получаем словарь {id: название}
-
-    # Добавляем кнопки для каждого раздела
-    for section_id, section_name in sections.items():
-        builder.button(
-            text=f"{'✅ ' if section_id in selected_section_ids else ''}{section_name}",
-            callback_data=f"sect_{section_id}"  # Формат: sect_<ID_раздела>
-        )
-
-    # Кнопка завершения выбора
-    builder.button(
-        text="✅ Завершить выбор",
-        callback_data="sect_done"
-    )
-
-    builder.adjust(1)  # По одной кнопке в строке
-
     try:
         subject_name = SUBJECTS.get(subject_id, "Неизвестный предмет")
         await message.answer(
             f"📖 Выберите разделы для предмета {subject_name}:",
-            reply_markup=builder.as_markup()
+            reply_markup=get_sections_keyboard(subject_id, selected_section_ids)
         )
     except Exception as e:
         print(f"Ошибка при запросе разделов: {e}")
         raise
-
-def get_subjects_keyboard(selected_ids: List[int] = None) -> InlineKeyboardMarkup:
-    """
-    Генерирует клавиатуру с предметами на основе ID
-
-    :param selected_ids: Список выбранных ID предметов
-    :return: Объект InlineKeyboardMarkup
-    """
-    if selected_ids is None:
-        selected_ids = []
-
-    builder = InlineKeyboardBuilder()
-
-    for subject_id, subject_name in SUBJECTS.items():
-        builder.button(
-            text=f"{'✅ ' if subject_id in selected_ids else ''}{subject_name}",
-            callback_data=f"subj_{subject_id}"
-        )
-
-    builder.button(text="Готово", callback_data="subj_done")
-    builder.adjust(1)  # По одному предмету в строке
-
-    return builder.as_markup()
-
 
 async def update_subjects_keyboard(
         callback: CallbackQuery,
@@ -107,10 +66,6 @@ async def update_subjects_keyboard(
 ) -> None:
     """
     Обновляет клавиатуру с предметами (редактирует сообщение)
-
-    :param callback: Объект CallbackQuery
-    :param selected_ids: Список выбранных ID предметов
-    :param message_text: Текст сообщения (по умолчанию)
     """
     try:
         keyboard = get_subjects_keyboard(selected_ids)
@@ -151,49 +106,6 @@ async def update_sections_keyboard(
             text=message_text,
             reply_markup=get_sections_keyboard(subject_id, selected_ids)
         )
-
-
-# Функция генерации клавиатуры разделов
-def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None) -> InlineKeyboardMarkup:
-    """Генерирует клавиатуру с разделами предмета"""
-    if selected_ids is None:
-        selected_ids = []
-
-    builder = InlineKeyboardBuilder()
-    sections = SUBJECT_SECTIONS.get(subject_id, {})
-
-    for section_id, section_name in sections.items():
-        builder.button(
-            text=f"{'✅ ' if section_id in selected_ids else ''}{section_name}",
-            callback_data=f"sect_{section_id}"
-        )
-
-    # Кнопка завершения
-    builder.button(
-        text="✅ Завершить выбор",
-        callback_data="sect_done"
-    )
-
-    builder.adjust(1)  # По одному разделу в строке
-    return builder.as_markup()
-
-def get_task_type_keyboard(selected_ids: List[int] = None) -> InlineKeyboardMarkup:
-    """Генерирует клавиатуру с типами задач"""
-    if selected_ids is None:
-        selected_ids = []
-
-    builder = InlineKeyboardBuilder()
-
-    for task_id, task_name in TYPE_OF_TASK.items():
-        builder.button(
-            text=f"{'✅ ' if task_id in selected_ids else ''}{task_name}",
-            callback_data=f"task_type_{task_id}"
-        )
-
-    builder.button(text="Готово", callback_data="task_type_done")
-    builder.adjust(1)
-    return builder.as_markup()
-
 
 async def update_task_type_keyboard(callback: CallbackQuery, selected_ids: List[int]):
     """Обновляет клавиатуру с типами задач"""
@@ -265,19 +177,6 @@ def get_years_form(experience: int) -> str:
         return "года"
     else:
         return "лет"
-
-def get_solver_main_menu_keyboard():
-    """Возвращает клавиатуру основного меню исполнителя"""
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Мой профиль")],
-            [KeyboardButton(text="Мои заказы")],
-            [KeyboardButton(text="Написать в поддержку")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=False
-    )
-
 
 def format_profile_text(data: dict) -> str:
     profile = [

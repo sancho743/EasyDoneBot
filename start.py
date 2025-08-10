@@ -1,12 +1,13 @@
 import asyncio
-from aiogram import Bot, Dispatcher, F, BaseMiddleware
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher
 
 from handler.RegistrationCustomerHandler import customer_router
 from handler.RegistrationExecutorHandler import executor_router
 from handler.StartHandler import router as start_router
 from handler.RegistrationHandler import router as registration_router
 from utils.config import API_TOKEN
+from handler.TaskHandler import task_router
+from utils.Middleware import RoleCheckMiddleware
 
 # Инициализация бота и диспетчера
 bot = Bot(token=API_TOKEN)
@@ -17,6 +18,9 @@ dp.include_router(start_router)
 dp.include_router(executor_router)
 dp.include_router(registration_router)
 dp.include_router(customer_router)
+dp.include_router(task_router)
+# Подключение middleware
+dp.message.middleware(RoleCheckMiddleware())
 
 async def main():
     try:

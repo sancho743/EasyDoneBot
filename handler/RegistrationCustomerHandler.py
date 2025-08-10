@@ -4,11 +4,10 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
 from aiogram import Router, F
 
-from service.RegistrationCustomerService import get_customer_main_menu_keyboard
 from service.RegistrationExecutorService import contains_links
-
+from utils.DataStore import user_roles
+from service.MenuService import get_customer_main_menu_keyboard
 customer_router = Router()
-
 
 class CustomerStates(StatesGroup):
     WAITING_CONSENT = State()
@@ -78,6 +77,11 @@ async def handle_name_input(message: Message, state: FSMContext):
         f"🔹 Роль: Заказчик",
         reply_markup=get_customer_main_menu_keyboard()
     )
+
+    # Сохраняем роль пользователя
+    user_roles[message.from_user.id] = 'customer'
+    print(f"DEBUG: Saved role for user {message.from_user.id}. Current roles: {user_roles}")
+
     await state.clear()  # Важно очистить состояние
 
 
