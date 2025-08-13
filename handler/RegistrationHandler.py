@@ -11,7 +11,7 @@ async def register_handler(callback: CallbackQuery, state: FSMContext):
     try:
         print(f"Начало регистрации для {callback.from_user.id}")
         await callback.answer()  # Важно: подтверждаем получение callback
-        await ask_for_role(callback, state)
+        await ask_for_role(callback)
     except Exception as e:
         print(f"Ошибка в register_handler: {e}")
         await callback.answer("Произошла ошибка, попробуйте позже")

@@ -1,19 +1,18 @@
 import traceback
 from pathlib import Path
-from typing import List
 
 from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from service.MenuService import get_solver_main_menu_keyboard
 from service.RegistrationExecutorService import ask_for_subjects, ask_for_description, contains_links, \
     ask_for_experience, ask_for_photo, ask_for_education, get_years_form, \
     format_profile_text, ask_for_sections, update_subjects_keyboard, update_sections_keyboard, \
     update_task_type_keyboard, ask_for_task_type
-from utils.DataStore import user_roles
+from service.DataBaseService import update_user_role, update_username
+from utils.filters import RoleFilter
 
 # Загружаем текст соглашения
 BASE_DIR = Path(__file__).parent.parent
@@ -70,7 +69,7 @@ async def handle_privacy_response(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 # Обработчик выбора предметов
-@executor_router.callback_query(F.data.startswith("subj_"))
+@executor_router.callback_query(F.data.startswith("subj_"), ExecutorStates.SELECTING_SUBJECTS)
 async def handle_subject_selection(callback: CallbackQuery, state: FSMContext):
     try:
         action = callback.data.split("_")[1]
@@ -299,7 +298,7 @@ async def handle_education_input(message: Message, state: FSMContext):
     await state.update_data(education=message.text)
     await ask_for_photo(message)
 
-@executor_router.message(F.photo)
+@executor_router.message(F.photo, ExecutorStates.WAITING_EDUCATION)
 async def handle_photo_upload(message: Message, state: FSMContext):
     try:
         print("Начало обработки фото...")  # Отладочное сообщение
@@ -323,8 +322,9 @@ async def handle_photo_upload(message: Message, state: FSMContext):
         print("Главное меню показано")
 
         # Сохраняем роль пользователя
-        user_roles[message.from_user.id] = 'executor'
-        print(f"DEBUG: Saved role for user {message.from_user.id}. Current roles: {user_roles}")
+        await update_user_role(user_id=message.from_user.id, role='executor')
+        await update_username(user_id=message.from_user.id, username=message.from_user.username)
+        print(f"DEBUG: Saved role for user {message.from_user.id}. Current roles: executor")
 
         # Здесь будет сохранение в БД
         # await save_executor_profile(data, photo_id)
@@ -337,17 +337,17 @@ async def handle_photo_upload(message: Message, state: FSMContext):
     finally:
         await state.clear()
 
-@executor_router.message(F.text == "Мой профиль")
+@executor_router.message(F.text == "Мой профиль", RoleFilter("executor"))
 async def handle_profile_request(message: Message):
     # Здесь будет логика показа профиля
-    await message.answer("📌 Ваш профиль:", reply_markup=get_solver_main_menu_keyboard())
+    await message.answer("📌 Ваш профиль:", RoleFilter("executor"))
 
 @executor_router.message(F.text == "Мои заказы")
 async def handle_orders_request(message: Message):
     # Здесь будет логика показа заказов
-    await message.answer("📦 Ваши текущие заказы:", reply_markup=get_solver_main_menu_keyboard())
+    await message.answer("📦 Ваши текущие заказы:", RoleFilter("executor"))
 
 @executor_router.message(F.text == "Написать в поддержку")
 async def handle_support_request(message: Message):
     # Здесь будет логика обращения в поддержку
-    await message.answer("🛟 Напишите ваш вопрос:", reply_markup=get_solver_main_menu_keyboard())
+    await message.answer("🛟 Напишите ваш вопрос:", RoleFilter("executor"))

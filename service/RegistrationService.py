@@ -1,16 +1,10 @@
 import re
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton
 from aiogram.types import CallbackQuery
-from aiogram.fsm.context import FSMContext
-
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from typing import List, Optional
 
-from utils.constants import SUBJECTS
-
-
-async def ask_for_role(callback: CallbackQuery, state: FSMContext):
+async def ask_for_role(callback: CallbackQuery):
     """Показывает выбор роли"""
     builder = InlineKeyboardBuilder()
     builder.add(
