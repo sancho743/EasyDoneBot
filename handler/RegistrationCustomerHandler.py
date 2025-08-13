@@ -5,8 +5,10 @@ from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKe
 from aiogram import Router, F
 
 from service.RegistrationExecutorService import contains_links
-from utils.DataStore import user_roles
 from service.MenuService import get_customer_main_menu_keyboard
+from service.DataBaseService import update_user_role, save_customer_profile
+from utils.filters import RoleFilter
+
 customer_router = Router()
 
 class CustomerStates(StatesGroup):
@@ -78,26 +80,29 @@ async def handle_name_input(message: Message, state: FSMContext):
         reply_markup=get_customer_main_menu_keyboard()
     )
 
-    # Сохраняем роль пользователя
-    user_roles[message.from_user.id] = 'customer'
-    print(f"DEBUG: Saved role for user {message.from_user.id}. Current roles: {user_roles}")
+    # Сохраняем пользователя
+    await update_user_role(user_id=message.from_user.id, username=  message.from_user.username, role='customer')
+    print(f"DEBUG: Saved role for user {message.from_user.id}. Current roles: customer")
+    # Сохраняем профиль заказчика
+    data = await state.get_data()
+    await save_customer_profile(user_id=message.from_user.id, data=data)
 
     await state.clear()  # Важно очистить состояние
 
 
 # Обработчики меню остаются без изменений
 
-@customer_router.message(F.text == "Мой профиль")
+@customer_router.message(F.text == "Мой профиль", RoleFilter("customer"))
 async def handle_profile_request(message: Message):
     # Здесь будет логика показа профиля
-    await message.answer("📌 Ваш профиль:", reply_markup=get_customer_main_menu_keyboard())
+    await message.answer("📌 Ваш профиль:")
 
-@customer_router.message(F.text == "Мои заказы")
+@customer_router.message(F.text == "Мои заказы", RoleFilter("customer"))
 async def handle_orders_request(message: Message):
     # Здесь будет логика показа заказов
-    await message.answer("📦 Ваши текущие заказы:", reply_markup=get_customer_main_menu_keyboard())
+    await message.answer("📦 Ваши текущие заказы:")
 
-@customer_router.message(F.text == "Написать в поддержку")
+@customer_router.message(F.text == "Написать в поддержку", RoleFilter("customer"))
 async def handle_support_request(message: Message):
     # Здесь будет логика обращения в поддержку
-    await message.answer("🛟 Напишите ваш вопрос:", reply_markup=get_customer_main_menu_keyboard())
+    await message.answer("🛟 Напишите ваш вопрос:")

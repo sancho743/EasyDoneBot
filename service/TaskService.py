@@ -1,51 +1,59 @@
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
-
 from service.KeyBoardService import get_subjects_keyboard, get_sections_keyboard, get_task_type_keyboard, \
     get_solution_format_keyboard, get_confirmation_keyboard
-from utils.constants import SUBJECTS, SUBJECT_SECTIONS, TYPE_OF_TASK
-
+from service.DataBaseService import get_all_subjects, get_sections_for_subject, get_all_task_types
 
 async def ask_for_task_subject(message: Message, state: FSMContext):
     """Запрашивает предмет для новой задачи."""
     await message.answer(
         "📚 Выберите предмет, по которому вам нужна помощь:",
-        reply_markup=get_subjects_keyboard(is_for_task=True)
+        reply_markup=await get_subjects_keyboard(is_for_task=True)
     )
 
 async def ask_for_task_sections(message: Message, state: FSMContext, subject_id: int):
     """Запрашивает разделы для выбранного предмета."""
-    subject_name = SUBJECTS.get(subject_id, "Неизвестный предмет")
+    # Here we might need a get_subject_by_id function to get the name
     await message.edit_text(
-        f"📖 Теперь выберите разделы для предмета «{subject_name}»:",
-        reply_markup=get_sections_keyboard(subject_id=subject_id)
+        f"📖 Теперь выберите разделы для предмета:",
+        reply_markup=await get_sections_keyboard(subject_id=subject_id)
     )
 
 async def ask_for_task_type(message: Message, state: FSMContext):
     """Запрашивает тип задачи."""
     await message.answer(
         "🔧 Выберите тип вашей задачи:",
-        reply_markup=get_task_type_keyboard()
+        reply_markup=await get_task_type_keyboard()
     )
 
 async def ask_for_solution_format(message: Message, state: FSMContext):
     """Запрашивает формат решения."""
     await message.answer(
         "📄 Выберите формат решения:",
-        reply_markup=get_solution_format_keyboard()
+        reply_markup=get_solution_format_keyboard()  # This one is static, no await needed
     )
 
+async def format_task_summary(data: dict) -> str:
+    """Форматирует сводку по задаче для подтверждения, получая имена из БД."""
 
-def format_task_summary(data: dict) -> str:
-    """Форматирует сводку по задаче для подтверждения."""
+    # Fetch all subjects and task types once to create a mapping
+    all_subjects = await get_all_subjects()
+    subjects_map = {s['subject_id']: s['subject_name'] for s in all_subjects}
+
+    all_task_types = await get_all_task_types()
+    task_types_map = {t['task_type_id']: t['type_name'] for t in all_task_types}
+
     subject_id = data.get("subject_id")
-    subject_name = SUBJECTS.get(subject_id, f"ID {subject_id}")
+    subject_name = subjects_map.get(subject_id, f"ID {subject_id}")
 
     section_ids = data.get("section_ids", [])
-    section_names = [SUBJECT_SECTIONS.get(subject_id, {}).get(s_id, f"ID {s_id}") for s_id in section_ids]
+    # To get section names, we need another DB call
+    sections_data = await get_sections_for_subject(subject_id)
+    sections_map = {s['section_id']: s['section_name'] for s in sections_data}
+    section_names = [sections_map.get(s_id, f"ID {s_id}") for s_id in section_ids]
 
     task_type_ids = data.get("task_type_ids", [])
-    task_type_names = [TYPE_OF_TASK.get(t_id, f"ID {t_id}") for t_id in task_type_ids]
+    task_type_names = [task_types_map.get(t_id, f"ID {t_id}") for t_id in task_type_ids]
 
     solution_format_key = data.get("solution_format")
     solution_formats = {
@@ -69,11 +77,10 @@ def format_task_summary(data: dict) -> str:
     ]
     return "\n".join(summary)
 
-
 async def ask_for_task_confirmation(message: Message, state: FSMContext):
     """Отправляет сводку задачи и запрашивает подтверждение."""
     data = await state.get_data()
-    summary_text = format_task_summary(data)
+    summary_text = await format_task_summary(data)  # Add await here
     await message.answer(
         text=summary_text,
         reply_markup=get_confirmation_keyboard(),

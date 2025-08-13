@@ -4,9 +4,10 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from service.MenuService import get_customer_main_menu_keyboard
 from service.RegistrationExecutorService import update_sections_keyboard, update_task_type_keyboard
 from service.TaskService import ask_for_task_subject, ask_for_task_sections, ask_for_task_type, \
-    ask_for_solution_format
+    ask_for_solution_format, ask_for_task_confirmation
 
 task_router = Router()
 
@@ -67,7 +68,6 @@ async def handle_sections_done_for_task(callback: CallbackQuery, state: FSMConte
 
 @task_router.message(TaskCreationStates.ENTERING_DESCRIPTION)
 async def handle_description_for_task(message: Message, state: FSMContext):
-    print(f"DEBUG: TaskHandler state is {await state.get_state()}")
     await state.update_data(description=message.text)
     await state.set_state(TaskCreationStates.SELECTING_TASK_TYPE)
     await ask_for_task_type(message, state)
@@ -103,14 +103,11 @@ async def handle_task_type_done_for_task(callback: CallbackQuery, state: FSMCont
 
 @task_router.callback_query(F.data.startswith("sol_format_"), TaskCreationStates.SELECTING_SOLUTION_FORMAT)
 async def handle_solution_format_selection(callback: CallbackQuery, state: FSMContext):
-    """Обрабатывает выбор формата решения и переходит к загрузке файлов."""
     solution_format = callback.data.split("sol_format_")[1]
     await state.update_data(solution_format=solution_format)
     await state.set_state(TaskCreationStates.UPLOADING_FILES)
-
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="✅ Готово", callback_data="files_done"))
-
     await callback.message.edit_text(
         "📎 Теперь прикрепите файлы с заданием (фото или документы). "
         "Отправьте все файлы, а затем нажмите 'Готово'.",
@@ -118,10 +115,9 @@ async def handle_solution_format_selection(callback: CallbackQuery, state: FSMCo
     )
     await callback.answer()
 
-
 @task_router.message(F.content_type.in_({'photo', 'document'}), TaskCreationStates.UPLOADING_FILES)
 async def handle_file_upload(message: Message, state: FSMContext):
-    """Ловит фото и документы, сохраняет их file_id."""
+    """Ловит фото и документы, сохраняет их file_id и снова показывает кнопку 'Готово'."""
     file_id = ""
     if message.photo:
         file_id = message.photo[-1].file_id
@@ -133,19 +129,38 @@ async def handle_file_upload(message: Message, state: FSMContext):
     file_ids.append(file_id)
     await state.update_data(file_ids=file_ids)
 
-    await message.reply("✅ Файл добавлен. Можете добавить еще или нажать 'Готово'.")
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text="✅ Готово", callback_data="files_done"))
+
+    await message.reply(
+        "✅ Файл добавлен. Можете добавить еще или нажать 'Готово'.",
+        reply_markup=builder.as_markup()
+    )
 
 
 @task_router.callback_query(F.data == "files_done", TaskCreationStates.UPLOADING_FILES)
 async def handle_files_done(callback: CallbackQuery, state: FSMContext):
-    """Завершает загрузку файлов и переходит к подтверждению."""
     data = await state.get_data()
     if not data.get("file_ids"):
         await callback.answer("Пожалуйста, прикрепите хотя бы один файл.", show_alert=True)
         return
-
     await state.set_state(TaskCreationStates.CONFIRMING_CREATION)
     await callback.message.delete()
-    # Placeholder for the next step
-    await callback.message.answer("Файлы загружены. Теперь шаг подтверждения.")
+    await ask_for_task_confirmation(callback.message, state)
+    await callback.answer()
+
+@task_router.callback_query(F.data == "confirm_task_creation", TaskCreationStates.CONFIRMING_CREATION)
+async def handle_task_confirmation_positive(callback: CallbackQuery, state: FSMContext):
+    # Here you would typically save the task to the database
+    # For now, just send a confirmation message
+    await state.clear()
+    await callback.message.edit_text("✅ Ваша задача успешно создана! Исполнители скоро откликнутся.")
+    await callback.message.answer("Главное меню:", reply_markup=get_customer_main_menu_keyboard())
+    await callback.answer()
+
+@task_router.callback_query(F.data == "cancel_task_creation", TaskCreationStates.CONFIRMING_CREATION)
+async def handle_task_confirmation_negative(callback: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback.message.edit_text("❌ Создание задачи отменено.")
+    await callback.message.answer("Главное меню:", reply_markup=get_customer_main_menu_keyboard())
     await callback.answer()
