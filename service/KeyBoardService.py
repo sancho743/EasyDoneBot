@@ -1,6 +1,6 @@
 from typing import List
 
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from service.DataBaseService import get_all_subjects, get_sections_for_subject, get_all_task_types
@@ -31,7 +31,8 @@ async def get_subjects_keyboard(selected_ids: List[int] = None, is_for_task: boo
     return builder.as_markup()
 
 
-async def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None) -> InlineKeyboardMarkup:
+async def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None,
+                                is_for_task: bool = False) -> InlineKeyboardMarkup:
     """
     Генерирует клавиатуру с разделами предмета из БД.
     """
@@ -49,16 +50,17 @@ async def get_sections_keyboard(subject_id: int, selected_ids: List[int] = None)
             callback_data=f"sect_{section_id}"
         )
 
-    builder.button(
-        text="✅ Завершить выбор",
-        callback_data="sect_done"
-    )
+    if not is_for_task:
+        builder.button(
+            text="✅ Завершить выбор",
+            callback_data="sect_done"
+        )
 
     builder.adjust(1)
     return builder.as_markup()
 
 
-async def get_task_type_keyboard(selected_ids: List[int] = None) -> InlineKeyboardMarkup:
+async def get_task_type_keyboard(selected_ids: List[int] = None, is_for_task: bool = False) -> InlineKeyboardMarkup:
     """
     Генерирует клавиатуру с типами задач из БД.
     """
@@ -76,7 +78,9 @@ async def get_task_type_keyboard(selected_ids: List[int] = None) -> InlineKeyboa
             callback_data=f"task_type_{task_type_id}"
         )
 
-    builder.button(text="Готово", callback_data="task_type_done")
+    if not is_for_task:
+        builder.button(text="Готово", callback_data="task_type_done")
+
     builder.adjust(1)
     return builder.as_markup()
 

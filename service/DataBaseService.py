@@ -104,25 +104,95 @@ async def save_customer_profile(user_id: int, data: dict):
     except Exception as e:
         print(f"Error saving customer profile for {user_id}: {e}")
 
-async def upload_file_to_storage(bot: Bot, file_id: str, user_id: int) -> str|None:
+
+async def upload_file_to_storage(bot: Bot, file_id: str, user_id: int, folder: str) -> str | None:
+    """
+    Downloads a file from Telegram and uploads it to a specified folder in Supabase Storage.
+    """
     try:
         file_info = await bot.get_file(file_id)
         file_path = file_info.file_path
+
+        # Generate a unique file name to avoid collisions
+        file_extension = file_path.split('.')[-1]
+        unique_filename = f"{file_id}.{file_extension}"
+
+        upload_path = f"{folder}/{unique_filename}"
+
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://api.telegram.org/file/bot{bot.token}/{file_path}") as response:
                 if response.status != 200:
-                    print(f"Error downloading file: {response.status}")
+                    print(f"Error downloading file from Telegram: {response.status}")
                     return None
                 file_content = await response.read()
-        bucket_name = "storage"  # Как вы и указали
-        upload_path = f"executor_profile_avatars/{user_id}/{file_id}.jpg"
 
-        supabase.storage.from_(bucket_name).upload(upload_path, file_content)
+        bucket_name = "storage"
 
-        public_url_response = supabase.storage.from_(bucket_name).get_public_url(upload_path)
-        return public_url_response
+        # Use upsert to avoid errors on re-uploading the same file
+        supabase.storage.from_(bucket_name).upload(
+            path=upload_path,
+            file=file_content,
+            file_options={
+                "content-type": "image/jpeg" if file_extension in ['jpg', 'jpeg'] else "application/octet-stream"}
+        )
+
+        public_url = supabase.storage.from_(bucket_name).get_public_url(upload_path)
+
+        print(f"Successfully uploaded file to {upload_path}. URL: {public_url}")
+        return public_url
 
     except Exception as e:
-        print(f"Error uploading file to storage for user {user_id}: {e}")
+        # Check if the error is a duplicate file error, which we can ignore
+        if "Duplicate" in str(e):
+            print(f"File {upload_path} already exists. Returning existing URL.")
+            # Construct the public URL manually if upload is skipped
+            return supabase.storage.from_("storage").get_public_url(upload_path)
+        print(f"Error in upload_file_to_storage for user {user_id}: {e}")
         return None
 
+
+async def update_task_attachments(task_id: int, urls: list):
+    """
+    Обновляет задачу, добавляя список ссылок на вложения.
+    """
+    try:
+        response = supabase.table('task').update({'attachments_urls': urls}).eq('task_id', task_id).execute()
+        print(f"Successfully updated attachments for task {task_id}")
+        if not response.data:
+             print(f"Warning: Update attachments for task {task_id} returned no data.")
+    except Exception as e:
+        print(f"Error updating task attachments for task {task_id}: {e}")
+
+
+async def get_customer_id(user_id: int) -> int | None:
+    """Получает ID профиля заказчика по ID пользователя Telegram."""
+    try:
+        response = supabase.table('customer').select('customer_id').eq('user_id', user_id).execute()
+        return response.data[0].get('customer_id') if response.data else None
+    except Exception as e:
+        print(f"Error getting customer_id for user {user_id}: {e}")
+        return None
+
+async def save_task(user_id: int, data: dict):
+    """Сохраняет новую задачу в базу данных."""
+    try:
+        customer_id = await get_customer_id(user_id)
+        if not customer_id:
+            raise Exception("Could not find customer profile for the user.")
+
+        task_data = {
+            'customer_id': customer_id,
+            'subject_id': data.get('subject_id'),
+            'section_id': data.get('section_id'),
+            'task_type_id': data.get('task_type_id'),
+            'description': data.get('description'),
+            'attachments_urls': data.get('attachment_urls'),
+        }
+        response = supabase.table('task').insert(task_data).execute()
+        if not response.data:
+            raise Exception("Failed to create task.")
+        print(f"Successfully saved task for customer {customer_id}")
+        return response.data[0]
+    except Exception as e:
+        print(f"Error saving task for user {user_id}: {e}")
+        return None
