@@ -187,6 +187,7 @@ async def save_task(user_id: int, data: dict):
             'task_type_id': data.get('task_type_id'),
             'description': data.get('description'),
             'attachments_urls': data.get('attachment_urls'),
+            'deadline': data.get('deadline')
         }
         response = supabase.table('task').insert(task_data).execute()
         if not response.data:

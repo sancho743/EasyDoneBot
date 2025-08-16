@@ -4,7 +4,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from service.MenuService import get_customer_main_menu_keyboard
-from service.TaskService import ask_for_task_subject, ask_for_task_sections, ask_for_task_type, ask_for_solution_format, ask_for_task_confirmation
+from service.TaskService import ask_for_task_subject, ask_for_task_sections, ask_for_task_type, ask_for_solution_format, \
+    ask_for_task_confirmation, ask_for_deadline
 from service.DataBaseService import save_task, update_task_attachments, upload_file_to_storage
 
 task_router = Router()
@@ -18,14 +19,14 @@ class TaskCreationStates(StatesGroup):
     SELECTING_SOLUTION_FORMAT = State()
     UPLOADING_FILES = State()
     CONFIRMING_CREATION = State()
-
+    ENTERING_DEADLINE = State()
 
 @task_router.message(F.text == "Создать задачу")
 async def handle_create_task(message: Message, state: FSMContext):
     """Starts the task creation flow."""
     await state.set_state(TaskCreationStates.SELECTING_SUBJECT)
     await state.set_data({})
-    await ask_for_task_subject(message, state)
+    await ask_for_task_subject(message)
 
 
 @task_router.callback_query(F.data.startswith("subj_"), TaskCreationStates.SELECTING_SUBJECT)
@@ -34,7 +35,7 @@ async def handle_subject_selection_for_task(callback: CallbackQuery, state: FSMC
     subject_id = int(callback.data.split("_")[1])
     await state.update_data(subject_id=subject_id)
     await state.set_state(TaskCreationStates.SELECTING_SECTION)
-    await ask_for_task_sections(callback.message, state, subject_id)
+    await ask_for_task_sections(callback.message, subject_id)
     await callback.answer()
 
 
@@ -54,7 +55,7 @@ async def handle_description_for_task(message: Message, state: FSMContext):
     """Handles description input and asks for task type."""
     await state.update_data(description=message.text)
     await state.set_state(TaskCreationStates.SELECTING_TASK_TYPE)
-    await ask_for_task_type(message, state)
+    await ask_for_task_type(message)
 
 
 @task_router.callback_query(F.data.startswith("task_type_"), TaskCreationStates.SELECTING_TASK_TYPE)
@@ -64,7 +65,7 @@ async def handle_task_type_selection_for_task(callback: CallbackQuery, state: FS
     await state.update_data(task_type_id=task_type_id)
     await state.set_state(TaskCreationStates.SELECTING_SOLUTION_FORMAT)
     await callback.message.delete()
-    await ask_for_solution_format(callback.message, state)
+    await ask_for_solution_format(callback.message)
     await callback.answer()
 
 
@@ -73,15 +74,22 @@ async def handle_solution_format_selection(callback: CallbackQuery, state: FSMCo
     """Handles solution format selection and asks for files."""
     solution_format = callback.data.split("sol_format_")[1]
     await state.update_data(solution_format=solution_format)
+    await state.set_state(TaskCreationStates.ENTERING_DEADLINE)
+    await callback.message.delete()
+    await ask_for_deadline(callback.message)
+    await callback.answer()
+
+@task_router.message(F.text, TaskCreationStates.ENTERING_DEADLINE)
+async def handle_deadline_input(message: Message, state: FSMContext):
+    await state.update_data(deadline=message.text)
     await state.set_state(TaskCreationStates.UPLOADING_FILES)
     builder = InlineKeyboardBuilder()
     builder.add(InlineKeyboardButton(text="✅ Готово", callback_data="files_done"))
-    await callback.message.edit_text(
+    await message.answer(
         "📎 Теперь прикрепите файлы с заданием (фото или документы). "
         "Отправьте все файлы, а затем нажмите 'Готово'.",
         reply_markup=builder.as_markup()
     )
-    await callback.answer()
 
 
 @task_router.message(F.content_type.in_({'photo', 'document'}), TaskCreationStates.UPLOADING_FILES)
