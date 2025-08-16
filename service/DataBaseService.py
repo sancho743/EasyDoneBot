@@ -43,7 +43,7 @@ async def get_all_subjects():
         return []
 
 async def get_all_task_types():
-    """Получает все типы задач из БД."""
+    """Получает все типы заказов из БД."""
     try:
         response = supabase.table('task_type').select('task_type_id, type_name').execute()
         return response.data if response.data else []
@@ -153,7 +153,7 @@ async def upload_file_to_storage(bot: Bot, file_id: str, user_id: int, folder: s
 
 async def update_task_attachments(task_id: int, urls: list):
     """
-    Обновляет задачу, добавляя список ссылок на вложения.
+    Обновляет заказ, добавляя список ссылок на вложения.
     """
     try:
         response = supabase.table('task').update({'attachments_urls': urls}).eq('task_id', task_id).execute()
@@ -174,7 +174,7 @@ async def get_customer_id(user_id: int) -> int | None:
         return None
 
 async def save_task(user_id: int, data: dict):
-    """Сохраняет новую задачу в базу данных."""
+    """Сохраняет новый заказ в базу данных."""
     try:
         customer_id = await get_customer_id(user_id)
         if not customer_id:

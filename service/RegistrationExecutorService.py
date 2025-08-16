@@ -50,7 +50,7 @@ async def update_sections_keyboard(callback: CallbackQuery, subject_id: int, sel
 
 
 async def update_task_type_keyboard(callback: CallbackQuery, selected_ids: List[int]):
-    """Обновляет клавиатуру с типами задач."""
+    """Обновляет клавиатуру с типами заказов."""
     await callback.message.edit_text(
         "Выберите типы задач:",
         reply_markup=await get_task_type_keyboard(selected_ids)
@@ -133,7 +133,7 @@ async def format_profile_text(data: dict) -> str:
     task_type_ids = data.get('task_types', [])
     if task_type_ids:
         task_type_names = [task_types_map.get(t_id, f"ID {t_id}") for t_id in task_type_ids]
-        profile_lines.append(f"🔧 Типы задач: {', '.join(task_type_names)}")
+        profile_lines.append(f"🔧 Типы решаемых задач: {', '.join(task_type_names)}")
 
     # 5. Добавляем остальную информацию
     profile_lines.extend([

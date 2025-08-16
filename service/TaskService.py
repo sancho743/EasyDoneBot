@@ -7,7 +7,7 @@ from service.KeyBoardService import get_subjects_keyboard, get_sections_keyboard
 from service.DataBaseService import get_all_subjects, get_sections_for_subject, get_all_task_types
 
 async def ask_for_task_subject(message: Message):
-    """Запрашивает предмет для новой задачи."""
+    """Запрашивает предмет для нового заказа."""
     await message.answer(
         "📚 Выберите предмет, по которому вам нужна помощь:",
         reply_markup=await get_subjects_keyboard(is_for_task=True)
@@ -22,9 +22,9 @@ async def ask_for_task_sections(message: Message, subject_id: int):
     )
 
 async def ask_for_task_type(message: Message):
-    """Запрашивает тип задачи."""
+    """Запрашивает тип заказа."""
     await message.answer(
-        "🔧 Выберите тип вашей задачи:",
+        "🔧 Выберите тип вашего заказа:",
         reply_markup=await get_task_type_keyboard()
     )
 
@@ -36,13 +36,13 @@ async def ask_for_solution_format(message: Message):
     )
 
 async def ask_for_deadline(message: Message):
-    """Запрашивает дедлайн выполнения задачи."""
+    """Запрашивает дедлайн выполнения заказа."""
     await message.answer(
-        "📄 Введите дату и/или время к которому должна быть выполнена задача. Вы можете ввести условия в свободном виде:"
+        "📄 Введите дату и/или время к которому должен быть выполнен заказ. Вы можете ввести условия в свободном виде:"
     )
 
 async def format_task_summary(data: dict) -> str:
-    """Форматирует сводку по задаче для подтверждения, получая имена из БД."""
+    """Форматирует сводку по заказу для подтверждения, получая имена из БД."""
 
     # Fetch all subjects and task types once to create a mapping
     all_subjects = await get_all_subjects()
@@ -75,7 +75,7 @@ async def format_task_summary(data: dict) -> str:
     deadline_text = html.escape(data.get('deadline', 'Не указан'))
     description_text = html.escape(data.get('description', 'Нет описания.'))
     summary = [
-        "🔍 Пожалуйста, проверьте детали вашей задачи:\n",
+        "🔍 Пожалуйста, проверьте детали вашего заказа:\n",
         f"<b>Предмет:</b> {subject_name}",
         f"<b>Разделы:</b> {section_name}",
         f"<b>Тип задачи:</b> {task_type_name}",
@@ -88,7 +88,7 @@ async def format_task_summary(data: dict) -> str:
     return "\n".join(summary)
 
 async def ask_for_task_confirmation(message: Message, state: FSMContext):
-    """Отправляет сводку задачи и запрашивает подтверждение."""
+    """Отправляет сводку заказа и запрашивает подтверждение."""
     data = await state.get_data()
     summary_text = await format_task_summary(data)  # Add await here
     await message.answer(

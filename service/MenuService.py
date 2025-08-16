@@ -4,7 +4,7 @@ def get_customer_main_menu_keyboard():
     """Возвращает клавиатуру основного меню заказчика."""
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="Создать задачу")],
+            [KeyboardButton(text="Создать заказ")],
             [KeyboardButton(text="Мой профиль")],
             [KeyboardButton(text="Мои заказы")],
             [KeyboardButton(text="Написать в поддержку")],

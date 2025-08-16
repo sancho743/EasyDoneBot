@@ -6,14 +6,12 @@ from aiogram import Router, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, Message, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-
 from utils.filters import RoleFilter
 from service.MenuService import get_solver_main_menu_keyboard
 from service.DataBaseService import update_user_role, save_executor_profile, \
     upload_file_to_storage
 from service.RegistrationExecutorService import ask_for_subjects, ask_for_description, contains_links, \
-    ask_for_experience, ask_for_photo, ask_for_education, get_years_form, \
+    ask_for_experience, ask_for_photo, ask_for_education, \
     format_profile_text, ask_for_sections, update_subjects_keyboard, update_sections_keyboard, \
     ask_for_task_type, update_task_type_keyboard
 
