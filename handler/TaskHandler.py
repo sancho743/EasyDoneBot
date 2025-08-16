@@ -102,28 +102,10 @@ async def handle_file_upload(message: Message, state: FSMContext):
 
 
 @task_router.callback_query(F.data == "files_done", TaskCreationStates.UPLOADING_FILES)
-async def handle_files_done(callback: CallbackQuery, state: FSMContext, bot: Bot):
-    """Finishes file upload and moves to confirmation, uploading files to storage."""
-    data = await state.get_data()
-    file_ids = data.get("file_ids", [])
-    if not file_ids:
-        await callback.answer("Пожалуйста, прикрепите хотя бы один файл.", show_alert=True)
-        return
-
-    await callback.message.edit_text("⏳ Загружаю ваши файлы в хранилище...")
-
-    attachment_urls = []
-    for file_id in file_ids:
-        url = await upload_file_to_storage(bot=bot, file_id=file_id, user_id=callback.from_user.id, folder='tasks')
-        if url:
-            attachment_urls.append(url)
-
-    await state.update_data(attachment_urls=attachment_urls)
-
+async def handle_files_done(callback: CallbackQuery, state: FSMContext):
+    """Moves to the confirmation step after files are selected."""
     await state.set_state(TaskCreationStates.CONFIRMING_CREATION)
-    # We need to use answer, not edit_text, as the previous message has no text to edit
-    await callback.message.answer("Почти готово!", reply_markup=None)
-    await callback.message.delete()  # clean up the "uploading" message
+    await callback.message.delete()
     await ask_for_task_confirmation(callback.message, state)
     await callback.answer()
 
